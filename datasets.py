@@ -1,7 +1,6 @@
 """Dataset classes. Modified from github.com/chrispla/mir_ref"""
 
 import csv
-import json
 import os
 import zipfile
 from pathlib import Path
@@ -10,13 +9,14 @@ import librosa
 import numpy as np
 import torch
 import wget
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 
 class MTAT(Dataset):
     def __init__(
         self,
+        args,
         root,
         download=True,
         pre_train=True,
@@ -33,36 +33,27 @@ class MTAT(Dataset):
         """
         super().__init__()
 
-        # open json config
-        with open("TEMP_mtat_config.json", "r") as f:
-            mtat_config = json.load(f)
-
         self.root = os.path.join(root, "music")
-        self.filetype = mtat_config["filetype"]
-        self.items_per_track = mtat_config["items_per_track"]
+        self.filetype = args.filetype
+        self.items_per_track = args.items_per_track
 
         # audio processing
-        self.sample_rate = mtat_config["sample_rate"]
-        self.min_track_len_seconds = 29.124036281179137
+        self.sample_rate = args.sr
+        self.target_track_length = 30
         self.min_track_len_frames = int(self.min_track_len_seconds * self.sample_rate)
         self.item_len_seconds = self.min_track_len_seconds / self.items_per_track
         self.item_len_frames = int(self.min_track_len_frames / self.items_per_track)
 
         # subset parameters
-        self.only_from_tag = mtat_config["only_from_tag"]
-        self.tracks_per_genre = mtat_config["tracks_per_genre"]
-        self.random_percentage = mtat_config["random_percentage"]
+        self.only_from_tag = args.only_from_tag
+        self.tracks_per_genre = args.tracks_per_genre
+        self.random_percentage = args.random_percentage
 
         # dataset
         self.track_ids = []
         self.audio_paths = {}
         self.labels = {}
         self.encoded_labels = {}
-
-        # mel spectrogram parameters
-        self.mel_hop_length = mtat_config["mel_hop_length"]
-        self.mel_n_fft = mtat_config["mel_n_fft"]
-        self.mel_n_mels = mtat_config["mel_n_mels"]
 
         if not os.path.exists(self.root):
             os.makedirs(self.root)
@@ -201,7 +192,6 @@ class MTAT(Dataset):
             ]
 
         if self.tracks_per_genre:
-            # only keep track_ids for 100 tracks of each genre
             new_track_ids = []
             genres = [
                 "classical",
@@ -298,3 +288,10 @@ class MTAT(Dataset):
 
         # we'll compute the mel spectrogram using torchaudio during training
         return torch.FloatTensor(y), torch.LongTensor(self.encoded_labels[t_id])
+
+    def get_dataloader(self, batch_size=args.batch_size, shuffle=True):
+        return DataLoader(
+            self,
+            batch_size=batch_size,
+            shuffle=shuffle,
+        )
