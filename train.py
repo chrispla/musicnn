@@ -1,4 +1,6 @@
 import argparse
+from datetime import datetime
+from pathlib import Path
 
 import torch
 from torch import nn
@@ -30,7 +32,7 @@ model = Musicnn(
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 dataset = MTAT(root="./data/mtat/", args=args)
-loader = dataset.get_loader(batch_size=args.batch_size, shuffle=True)
+loader = dataset.get_dataloader(batch_size=args.batch_size, shuffle=True)
 
 loss_function = nn.BCELoss()
 optimizer = Adam(
@@ -38,9 +40,13 @@ optimizer = Adam(
 )
 # Adaptive learning rate
 scheduler = lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode="min", factor=0.5, patience=args.lr_patience, verbose=True
+    optimizer, mode="min", factor=0.5, patience=args.lr_patience
 )
 model.to(device)
+
+run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+checkpoint_dir = Path("./ckpt") / run_name
+checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
 for epoch in range(args.epochs):
     model.train()
@@ -67,5 +73,8 @@ for epoch in range(args.epochs):
     scheduler.step(running_loss)
 
     # save model
-    if (epoch + 1) % 10 == 0:
-        torch.save(model.state_dict(), f"model_{epoch}_loss_{running_loss}.pth")
+    if (epoch + 1) % 50 == 0:
+        torch.save(
+            model.state_dict(),
+            checkpoint_dir / f"model_{epoch}_loss_{format(running_loss, '.3f')}.pth",
+        )

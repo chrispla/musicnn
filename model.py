@@ -61,6 +61,8 @@ class Musicnn(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+        if len(x.shape) == 2:
+            x = x.unsqueeze(1)
         x = torch.log(self.melspec(x) + 1e-8)
         x = self.front_end(x)
         x = self.midend(x)

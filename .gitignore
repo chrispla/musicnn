@@ -170,3 +170,6 @@ test.ipynb
 
 # wandb
 wandb/
+
+# ckpt dir
+ckpt/

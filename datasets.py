@@ -33,16 +33,18 @@ class MTAT(Dataset):
         """
         super().__init__()
 
-        self.root = os.path.join(root, "music")
+        self.root = root
         self.filetype = args.filetype
         self.items_per_track = args.items_per_track
 
         # audio processing
         self.sample_rate = args.sr
-        self.target_track_length = 30
-        self.min_track_len_frames = int(self.min_track_len_seconds * self.sample_rate)
-        self.item_len_seconds = self.min_track_len_seconds / self.items_per_track
-        self.item_len_frames = int(self.min_track_len_frames / self.items_per_track)
+        self.target_track_len_seconds = 30
+        self.target_track_len_frames = int(
+            self.target_track_len_seconds * self.sample_rate
+        )
+        self.item_len_seconds = self.target_track_len_seconds / self.items_per_track
+        self.item_len_frames = int(self.target_track_len_frames / self.items_per_track)
 
         # subset parameters
         self.only_from_tag = args.only_from_tag
@@ -69,8 +71,8 @@ class MTAT(Dataset):
 
     def download_audio(self):
         # make data dir if it doesn't exist or if it exists but is empty
-        if os.path.exists(os.path.join(self.root, "MTAT", "audio")) and (
-            len(os.listdir(os.path.join(self.root, "MTAT", "audio"))) != 0
+        if os.path.exists(os.path.join(self.root, "audio")) and (
+            len(os.listdir(os.path.join(self.root, "audio"))) != 0
         ):
             import warnings
 
@@ -90,7 +92,7 @@ class MTAT(Dataset):
                 out=os.path.join(self.root, "MTAT/", "audio"),
             )
 
-        archive_dir = os.path.join(self.root, "MTAT", "audio")
+        archive_dir = os.path.join(self.root, "audio")
 
         # Combine the split archive files into a single file
         with open(os.path.join(archive_dir, "mp3.zip"), "wb") as f:
@@ -110,8 +112,8 @@ class MTAT(Dataset):
             os.remove(os.path.join(archive_dir, f"mp3.zip{i}"))
 
     def download_metadata(self):
-        if os.path.exists(os.path.join(self.root, "MTAT", "metadata")) and (
-            len(os.listdir(os.path.join(self.root, "MTAT", "metadata"))) != 0
+        if os.path.exists(os.path.join(self.root, "metadata")) and (
+            len(os.listdir(os.path.join(self.root, "metadata"))) != 0
         ):
             import warnings
 
@@ -135,12 +137,12 @@ class MTAT(Dataset):
         for url in urls:
             wget.download(
                 url=url,
-                out=os.path.join(self.root, "MTAT", "metadata/"),
+                out=os.path.join(self.root, "metadata/"),
             )
 
     def load_track_ids(self):
         with open(
-            os.path.join(self.root, "MTAT", "metadata", "annotations_final.csv"), "r"
+            os.path.join(self.root, "metadata", "annotations_final.csv"), "r"
         ) as f:
             annotations = csv.reader(f, delimiter="\t")
             next(annotations)  # skip header
@@ -164,10 +166,10 @@ class MTAT(Dataset):
 
     def load_labels(self):
         # get the list of top 50 tags used in Minz Won et al. 2020
-        tags = np.load(os.path.join(self.root, "MTAT", "metadata", "tags.npy"))
+        tags = np.load(os.path.join(self.root, "metadata", "tags.npy"))
 
         with open(
-            os.path.join(self.root, "MTAT", "metadata", "annotations_final.csv"), "r"
+            os.path.join(self.root, "metadata", "annotations_final.csv"), "r"
         ) as f:
             annotations = csv.reader(f, delimiter="\t")
             annotations_header = next(annotations)
@@ -192,6 +194,7 @@ class MTAT(Dataset):
             ]
 
         if self.tracks_per_genre:
+            self.tracks_per_genre = int(self.tracks_per_genre)
             new_track_ids = []
             genres = [
                 "classical",
@@ -218,12 +221,12 @@ class MTAT(Dataset):
 
     def load_audio_paths(self):
         with open(
-            os.path.join(self.root, "MTAT", "metadata", "annotations_final.csv"), "r"
+            os.path.join(self.root, "metadata", "annotations_final.csv"), "r"
         ) as f:
             annotations = csv.reader(f, delimiter="\t")
             next(annotations)  # skip header
             self.audio_paths = {
-                line[0]: os.path.join(self.root, "MTAT", "audio", line[-1])
+                line[0]: os.path.join(self.root, "audio", line[-1])
                 for line in annotations
                 # this is a slow way to do it, temporary fix for some corrupt mp3s
                 if line[0] in self.track_ids
@@ -287,9 +290,9 @@ class MTAT(Dataset):
             y = y[: self.item_len_frames]
 
         # we'll compute the mel spectrogram using torchaudio during training
-        return torch.FloatTensor(y), torch.LongTensor(self.encoded_labels[t_id])
+        return torch.FloatTensor(y), torch.FloatTensor(self.encoded_labels[t_id])
 
-    def get_dataloader(self, batch_size=args.batch_size, shuffle=True):
+    def get_dataloader(self, batch_size=32, shuffle=True):
         return DataLoader(
             self,
             batch_size=batch_size,
