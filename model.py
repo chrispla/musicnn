@@ -5,6 +5,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchaudio.transforms import MelSpectrogram
 
 
 class Musicnn(nn.Module):
@@ -16,32 +17,51 @@ class Musicnn(nn.Module):
 
     Args:
     - y_input_dim (int): height of the input
-    - timbral_k_height (float or list): timbral filter height as a factor of the input dim 
-    - temporal_k_width (int or list): temporal filter width of the input dim 
+    - timbral_k_height (float or list): timbral filter height as a factor of the input dim
+    - temporal_k_width (int or list): temporal filter width of the input dim
     - filter_factor (float): factor that controls the number of filters (output channels)
     - pool_type: type of pooling in the backend (temporal or attention)
 
     """
-    def __init__(self,
-                 y_input_dim,
-                 filter_factor,
-                 pool_type,
-                 timbral_k_height=None,
-                 temporal_k_width=None):
+
+    def __init__(
+        self,
+        args,
+        y_input_dim,
+        filter_factor,
+        pool_type,
+        timbral_k_height=None,
+        temporal_k_width=None,
+    ):
         super(Musicnn, self).__init__()
+        self.melspec = MelSpectrogram(
+            sample_rate=args.sr,
+            n_fft=args.n_fft,
+            win_length=args.n_fft,
+            hop_length=args.hop_length,
+            center=True,
+            pad_mode="reflect",
+            power=2.0,
+            norm="slaney",
+            n_mels=args.n_mels,
+        )
         self.pool_type = pool_type
-        self.front_end = FrontEnd(y_input_dim, timbral_k_height, temporal_k_width,
-                                  filter_factor)
+        self.front_end = FrontEnd(
+            y_input_dim, timbral_k_height, temporal_k_width, filter_factor
+        )
 
         # front_end_channels = self.front_end.out_channels
         frontend_output_height = 561
         self.midend = MidEnd(input_channels=frontend_output_height)
 
-        self.midend_channels = (self.midend.num_of_filters*3)+frontend_output_height
-        self.back_end = BackEnd(input_height=self.midend_channels, output_units=50, pool_type=self.pool_type)
+        self.midend_channels = (self.midend.num_of_filters * 3) + frontend_output_height
+        self.back_end = BackEnd(
+            input_height=self.midend_channels, output_units=50, pool_type=self.pool_type
+        )
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
+        x = torch.log(self.melspec(x) + 1e-8)
         x = self.front_end(x)
         x = self.midend(x)
         x = self.back_end(x)
@@ -51,9 +71,9 @@ class Musicnn(nn.Module):
 
 
 class FrontEnd(nn.Module):
-    """Musically motivated CNN front-end single layer http://mtg.upf.edu/node/3508. """
-    def __init__(self, y_input_dim, timbral_k_height, temporal_k_width,
-                 filter_factor):
+    """Musically motivated CNN front-end single layer http://mtg.upf.edu/node/3508."""
+
+    def __init__(self, y_input_dim, timbral_k_height, temporal_k_width, filter_factor):
         super(FrontEnd, self).__init__()
         self.y_input_dim = y_input_dim
         self.filter_factor = filter_factor
@@ -84,27 +104,31 @@ class FrontEnd(nn.Module):
 
     def timbral_block(self, k_h):
         out_channels = int(self.filter_factor * 128)
-        conv_layer = nn.Conv2d(in_channels=1,
-                               out_channels=out_channels,
-                               kernel_size=(k_h, 8),
-                               padding=(0, 3))
+        conv_layer = nn.Conv2d(
+            in_channels=1,
+            out_channels=out_channels,
+            kernel_size=(k_h, 8),
+            padding=(0, 3),
+        )
         batch_norm = nn.BatchNorm2d(num_features=out_channels)
         h_out = self.y_input_dim - k_h + 1
-        pool_layer = nn.MaxPool2d(kernel_size=(h_out, 1),
-                                  stride=(h_out, 1))
+        pool_layer = nn.MaxPool2d(kernel_size=(h_out, 1), stride=(h_out, 1))
 
         return conv_layer, batch_norm, pool_layer
 
     def temporal_block(self, k_w):
         out_channels = int(self.filter_factor * 32)
         pad_w = (k_w - 1) // 2
-        conv_layer = nn.Conv2d(in_channels=1,
-                               out_channels=out_channels,
-                               kernel_size=(1, k_w),
-                               padding=(0, pad_w))
+        conv_layer = nn.Conv2d(
+            in_channels=1,
+            out_channels=out_channels,
+            kernel_size=(1, k_w),
+            padding=(0, pad_w),
+        )
         batch_norm = nn.BatchNorm2d(num_features=out_channels)
-        pool_layer = nn.MaxPool2d(kernel_size=(self.y_input_dim, 1),
-                                  stride=(self.y_input_dim, 1))
+        pool_layer = nn.MaxPool2d(
+            kernel_size=(self.y_input_dim, 1), stride=(self.y_input_dim, 1)
+        )
 
         return conv_layer, batch_norm, pool_layer
 
@@ -128,30 +152,28 @@ class MidEnd(nn.Module):
       (i.e. the number of output channels)
 
     """
+
     def __init__(self, input_channels, num_of_filters=64):
         super(MidEnd, self).__init__()
         self.input_channels = input_channels
         self.num_of_filters = num_of_filters
 
         # LAYER 1
-        self.conv1 = nn.Conv1d(self.input_channels,
-                               self.num_of_filters,
-                               kernel_size=7,
-                               padding=3)
+        self.conv1 = nn.Conv1d(
+            self.input_channels, self.num_of_filters, kernel_size=7, padding=3
+        )
         self.batch_norm1 = nn.BatchNorm1d(num_features=self.num_of_filters)
         # LAYER 2
         nn.init.xavier_uniform_(self.conv1.weight)
-        self.conv2 = nn.Conv1d(self.num_of_filters,
-                               self.num_of_filters,
-                               kernel_size=7,
-                               padding=3)
+        self.conv2 = nn.Conv1d(
+            self.num_of_filters, self.num_of_filters, kernel_size=7, padding=3
+        )
         self.batch_norm2 = nn.BatchNorm1d(num_features=self.num_of_filters)
         # LAYER 3
         nn.init.xavier_uniform_(self.conv2.weight)
-        self.conv3 = nn.Conv1d(self.num_of_filters,
-                               self.num_of_filters,
-                               kernel_size=7,
-                               padding=3)
+        self.conv3 = nn.Conv1d(
+            self.num_of_filters, self.num_of_filters, kernel_size=7, padding=3
+        )
         self.batch_norm3 = nn.BatchNorm1d(num_features=self.num_of_filters)
 
     def forward(self, x):
@@ -183,17 +205,19 @@ class BackEnd(nn.Module):
         if self.pool_type == "temporal":
             self.mean_pool = nn.AvgPool2d(kernel_size=(1, 186))
             self.max_pool = nn.MaxPool2d(kernel_size=(1, 186))
-            self.batch_norm = nn.BatchNorm1d(self.input_height*2)
-            self.dense = nn.Linear(in_features=self.input_height*2, out_features=200)
+            self.batch_norm = nn.BatchNorm1d(self.input_height * 2)
+            self.dense = nn.Linear(in_features=self.input_height * 2, out_features=200)
             self.bn_dense = nn.BatchNorm1d(200)
             self.dense2 = nn.Linear(in_features=200, out_features=50)
         # attention
         elif self.pool_type == "attention":
             context = 3
-            self.attention = nn.Conv1d(in_channels=self.input_height,
-                                       out_channels=self.input_height,
-                                       kernel_size=context,
-                                       padding=int(context / 3))
+            self.attention = nn.Conv1d(
+                in_channels=self.input_height,
+                out_channels=self.input_height,
+                kernel_size=context,
+                padding=int(context / 3),
+            )
             self.softmax = nn.Softmax(dim=1)
             self.batch_norm = nn.BatchNorm1d(self.input_height)
             self.dense = nn.Linear(in_features=self.input_height, out_features=100)
