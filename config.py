@@ -11,6 +11,7 @@ config = {
     "n_mels": 96,
     "sr": 16000,
     # dataset
+    "dataset_dir": "./data/mtat/",
     "filetype": "wav",
     "items_per_track": 10,
     "only_from_tag": None,
