@@ -1,6 +1,7 @@
 import argparse
 
 import torch
+import wandb
 from audio_tagging_pytorch.models.musicnn import Musicnn
 from dataset import MTAT
 from torch import nn
@@ -8,6 +9,9 @@ from torch.optim import Adam, lr_scheduler
 from tqdm import tqdm
 
 from config import config
+
+# Initialize wandb
+wandb.init(project="musicnn")
 
 parser = argparse.ArgumentParser(description="Training.")
 for k, v in config.items():
@@ -55,6 +59,10 @@ for epoch in range(args.epochs):
         optimizer.step()
         running_loss += loss.item()
         pbar.set_description(f"Epoch {epoch+1}, Loss: {running_loss/(i+1):.4f}")
+
+        # Log metrics to wandb
+        wandb.log({"Loss": running_loss / (i + 1)})
+        wandb.log({"Learning Rate": optimizer.param_groups[0]["lr"]})
 
     scheduler.step(running_loss)
 
