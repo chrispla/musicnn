@@ -1,21 +1,21 @@
 import argparse
 
 import torch
-import wandb
-from audio_tagging_pytorch.models.musicnn import Musicnn
-from dataset import MTAT
 from torch import nn
 from torch.optim import Adam, lr_scheduler
 from tqdm import tqdm
 
+import wandb
 from config import config
+from datasets import MTAT
+from model import Musicnn
 
 # Initialize wandb
 wandb.init(project="musicnn")
 
 parser = argparse.ArgumentParser(description="Training.")
 for k, v in config.items():
-    parser.add_argument(f"--{k}", type=type(v), default=v)
+    parser.add_argument(f"--{k}", default=v)
 args = parser.parse_args()
 
 model = Musicnn(
