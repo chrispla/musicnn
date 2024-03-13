@@ -54,6 +54,10 @@ run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
 checkpoint_dir = Path("./ckpt") / run_name
 checkpoint_dir.mkdir(exist_ok=True, parents=True)
 
+# log dataset size for sanity
+wandb.log({"Number of items": len(dataset)})
+wandb.log({"Number of tracks": len(dataset.track_ids)})
+
 for epoch in range(args.epochs):
     model.train()
     running_loss = 0.0
