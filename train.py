@@ -15,10 +15,16 @@ from model import Musicnn
 # Initialize wandb
 wandb.init(project="musicnn")
 
+
 parser = argparse.ArgumentParser(description="Training.")
 for k, v in config.items():
     parser.add_argument(f"--{k}", default=v)
 args = parser.parse_args()
+
+# log args
+wandb.config.update(args)
+# name wandb run according to args.tracks_per_genre
+wandb.run.name = f"musicnn_{args.tracks_per_genre}_{args.epochs}"
 
 model = Musicnn(
     args=args,
