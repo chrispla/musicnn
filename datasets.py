@@ -194,6 +194,7 @@ class MTAT(Dataset):
             ]
 
         if self.tracks_per_genre:
+            self.tracks_per_genre = int(self.tracks_per_genre)
             # keep track_per_genre tracks from each of the top 12 genres
             # only select a track if it contains a single genre annotation
             # e.g. rock and woman is fine, but not rock and pop
