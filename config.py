@@ -1,6 +1,6 @@
 config = {
     # training
-    "batch_size": 40,
+    "batch_size": 50,
     "learning_rate": 1e-3,
     "weight_decay": 1e-5,
     "lr_patience": 10,

@@ -24,7 +24,7 @@ args = parser.parse_args()
 # log args
 wandb.config.update(args)
 # name wandb run according to args.tracks_per_genre
-wandb.run.name = f"musicnn_{args.tracks_per_genre}_{args.epochs}"
+wandb.run.name = f"musicnn_{args.tracks_per_genre}_{args.epochs}_MTAT"
 
 model = Musicnn(
     args=args,
