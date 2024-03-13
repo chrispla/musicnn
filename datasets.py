@@ -333,7 +333,7 @@ class MTAT(Dataset):
         # we'll compute the mel spectrogram using torchaudio during training
         return torch.FloatTensor(y), torch.FloatTensor(self.encoded_labels[t_id])
 
-    def get_dataloader(self, batch_size=32, shuffle=True, num_workers=4):
+    def get_dataloader(self, batch_size=32, shuffle=True, num_workers=0):
         return DataLoader(
             self,
             batch_size=batch_size,
