@@ -194,7 +194,13 @@ class MTAT(Dataset):
             ]
 
         if self.tracks_per_genre:
-            self.tracks_per_genre = int(self.tracks_per_genre)
+            # keep track_per_genre tracks from each of the top 12 genres
+            # only select a track if it contains a single genre annotation
+            # e.g. rock and woman is fine, but not rock and pop
+
+            # if this flag is used, we assume that the dataset
+            # is used for training, and so only tracks from the
+            # train split should be used.
             new_track_ids = []
             genres = [
                 "classical",
@@ -204,19 +210,25 @@ class MTAT(Dataset):
                 "indian",
                 "opera",
                 "pop",
-                "classic",
                 "new age",
-                "dance",
                 "country",
-                "metal",
+                "choral",
             ]
+            train_track_ids = self.get_splits()["train"]
             counts = {k: 0 for k in genres}
-            for t_id in self.track_ids:
+            for t_id in train_track_ids:
+                # only proceed if track has a single genre
+                genres_count = 0
                 for label in self.labels[t_id]:
                     if label in genres:
-                        if counts[label] < self.tracks_per_genre:
-                            new_track_ids.append(t_id)
-                            counts[label] += 1
+                        genres_count += 1
+                if genres_count == 1:
+                    # make sure we don't add more than tracks_per_genre
+                    for label in self.labels[t_id]:
+                        if label in genres:
+                            if counts[label] < self.tracks_per_genre:
+                                new_track_ids.append(t_id)
+                                counts[label] += 1
             self.track_ids = new_track_ids
 
     def load_audio_paths(self):
@@ -250,6 +262,34 @@ class MTAT(Dataset):
         self.encoded_labels = {
             track_ids[i]: encoded_labels_list[i] for i in range(len(track_ids))
         }
+
+    def get_splits(self):
+        # get inverse dictionary to get track id from audio path
+        rel_path_to_track_id = {
+            (Path(v).parent.name + "/" + Path(v).name): k
+            for k, v in self.audio_paths.items()
+        }
+
+        split = {}
+        for set_filename, set_targetname in zip(
+            ["train", "valid", "test"], ["train", "validation", "test"]
+        ):
+            relative_paths = np.load(
+                os.path.join(self.root, "metadata", f"{set_filename}.npy")
+            )
+
+            # if filetype is wav, replace mp3 with wav
+            if self.filetype == "wav":
+                relative_paths = [
+                    path.replace(".mp3", ".wav") for path in relative_paths
+                ]
+
+            # get track_ids by getting the full path and using the inv dict
+            split[set_targetname] = [
+                rel_path_to_track_id[path.split("\t")[1]] for path in relative_paths
+            ]
+
+        return split
 
     def __len__(self):
         return len(self.track_ids) * self.items_per_track

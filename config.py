@@ -1,6 +1,6 @@
 config = {
     # training
-    "batch_size": 32,
+    "batch_size": 40,
     "learning_rate": 1e-3,
     "weight_decay": 1e-5,
     "lr_patience": 10,
@@ -15,6 +15,6 @@ config = {
     "filetype": "wav",
     "items_per_track": 10,
     "only_from_tag": None,
-    "tracks_per_genre": None,
+    "tracks_per_genre": 100,
     "random_percentage": None,
 }
